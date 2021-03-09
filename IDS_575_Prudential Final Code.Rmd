@@ -1,0 +1,815 @@
+title: "Final_code"
+575 Final project - Prudential life insuarance
+---
+#Author: Ritu Gangwal, Nikita Bawane and Ashok
+  
+#This is our final code. First lets run the packages and load some data
+
+```{r}
+
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("lubridate")
+library(lubridate)
+install.packages("ggplot2")
+library(ggplot2)
+install.packages("dplyr")
+library(dplyr)
+install.packages("caret")
+library(caret)
+install.packages("e1071")
+library(e1071)
+install.packages("ROCR")
+library(ROCR)
+install.packages("rsample")
+library(rsample)
+install.packages("corrplot")
+library(corrplot)
+install.packages("ranger")
+library(ranger)
+install.packages("glmnet")
+library(glmnet)
+install.packages("dummies")
+library(dummies)
+install.packages("som")
+library("som")
+install.packages("randomForest")
+library('randomForest')
+install.packages("klaR")
+library(klaR)
+install.packages("class")
+library('class')
+
+
+```
+
+
+
+# The train_prudential.csv file contains data of various insuarance holders, which we will use for this analyses. Lets read the data first
+```{r}
+
+prudential_data <- read_csv("C:/Users/ritu2/Desktop/UIC MSBA/Sem 1/Statistical models/Project/prudential-life-insurance-assessment/train.csv/train_prudential.csv")
+
+str(prudential_data)
+
+```
+
+
+#changing some variables
+```{r}
+
+#changing target variable "response" to binomial 0 and 1. 1 for "High risk" and 0 for "Low Risk"
+prudential_data <- prudential_data %>% mutate(Response=ifelse(Response<5,0,1))
+table(prudential_data$Response)
+
+#changing character to factor
+prudential_data= prudential_data %>% mutate_if(is.character, as.factor)
+
+str(prudential_data)
+
+```
+
+
+#data exploration Boxplots and Desity Plots
+```{r}
+#data exploration
+
+#Exploration of Dataset
+#frequency of reponse variable
+df <- prudential_data %>% group_by(Response) %>% count(Response) 
+ggplot(df, aes(x = Response,y = n, fill = factor(Response))) + geom_bar(stat = "identity") + xlab("Response") + ylab("Frequency") +geom_text(aes(label=n), vjust=1.5, colour="white", size=3.5)
+c<- levels(as.factor(prudential_data$Response))
+
+#BMI box plot for different Response variable
+ggplot(prudential_data, aes(x = as.factor(Response) , y = BMI, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot()+xlab("Response")+labs(fill = "Response")
+
+# Ht box plot for different Response variable
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Ht, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot() +xlab("Response") + labs(fill = "Response")
+
+# Wt box plot for different Response variable
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Wt, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot() +xlab("Response") + labs(fill = "Response")
+
+# Ins_Age box plot for different Response variable
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Ins_Age, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot() +xlab("Response") + labs(fill = "Response")
+
+# Product_Info_4 box plot for different Response variable
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Product_Info_4, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot() +xlab("Response") + labs(fill = "Response")
+#This contained non infinitive values
+#Not using this plot
+
+# Insurance_History_5 box plot for different Response variable
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Insurance_History_5, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot() +xlab("Response") + labs(fill = "Response")
+#This contained non infinitive values
+#Not using this plot
+
+# Employment_Info_1 box plot for different Response variable
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Employment_Info_1, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot() +xlab("Response") + labs(fill = "Response")
+#This contained non infinitive values
+#Not using this plot
+
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Employment_Info_6, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot() +xlab("Response")
+#This contained non infinitive values
+#Not using this plot
+
+#Family History
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Family_Hist_2, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot()
+
+ggplot(prudential_data, aes(x = as.factor(Response) , y = Family_Hist_4, group = as.factor(Response),  fill = as.factor(Response))) + geom_boxplot()
+
+#Density Plots
+ggplot(prudential_data, aes(x= Product_Info_4, fill=as.factor(Response))) + geom_density(alpha=0.4)
+
+ggplot(prudential_data, aes(x= BMI, fill=as.factor(Response))) + geom_density(alpha=0.4)
+
+```
+
+
+#missing value graphs
+```{r}
+missing.values <- prudential_data %>% gather(key = "key", value = "val") %>% mutate(is.missing = is.na(val)) %>% group_by(key, is.missing) %>% summarise(num.missing = n()) %>% filter(is.missing==T) %>%
+dplyr::select(-is.missing) %>% arrange(desc(num.missing))
+
+ggplot(missing.values,aes(x=key, y=num.missing, fill = key)) + geom_bar(stat = 'identity') +
+labs(x='variable', y="number of missing values", title='Number of missing values') + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_text(aes(label=num.missing), vjust=1.5, colour="white", size=3.5)
+
+#missing value plot for percentage
+missing.values <- prudential_data %>% gather(key = "key", value = "val") %>% mutate(isna = is.na(val)) %>% group_by(key) %>% mutate(total = n()) %>% group_by(key, total, isna) %>% summarise(num.isna = n()) %>% mutate(pct = num.isna / total * 100)
+
+
+levels <- (missing.values  %>% filter(isna == T) %>% arrange(desc(pct)))$key
+
+percentage.plot <- missing.values %>% ggplot() + geom_bar(aes(x = reorder(key, desc(pct)), y = pct, fill=isna), stat = 'identity', alpha=0.8) + scale_x_discrete(limits = levels) + scale_fill_manual(name = "", values = c('steelblue', 'tomato3'), labels = c("Present", "Missing")) + coord_flip() + labs(title = "Percentage of missing values", x = 'Variable', y = "% of missing values")
+
+percentage.plot
+
+```
+
+
+#missing values and replacement
+```{r}
+
+#remove variables which have more than, for example, 70% missing values
+nm<-names(prudential_data)[colMeans(is.na(prudential_data))>0.7]
+prudential_data <- prudential_data %>% dplyr::select(-nm)
+
+#variables left with missing values - replacing with median
+rm<-names(prudential_data)[colMeans(is.na(prudential_data))>0]
+missingvals <- prudential_data %>% dplyr::select(rm)
+summary(missingvals)
+
+prudential_data <- prudential_data %>% mutate_all(.,funs(ifelse(is.na(.),median(.,na.rm=TRUE),.)))
+
+rm<-names(prudential_data)[colMeans(is.na(prudential_data))>0]
+
+
+
+```
+
+
+#Medical Keywords
+```{r}
+
+#creating a new variable = sum for all 48 medical keywords 
+Medical_Keyword_df<-prudential_data %>% dplyr::select(starts_with("Medical_Keyword"))
+prudential_data <- prudential_data %>% mutate(Medical_Keyword=rowSums(Medical_Keyword_df))
+
+#taking counts of all possible values
+prudential_data %>% group_by(Medical_Keyword) %>% summarize(cnt=n()) %>% arrange(Medical_Keyword)
+
+#removing all 48 medical keyword variables
+prudential_data = prudential_data %>% dplyr::select(-starts_with("Medical_Keyword_"))
+
+#Histogram of Medical History Keywords
+# Distribution of custom column Medical_Keyword is normal
+ggplot(prudential_data, aes(x=Medical_Keyword)) + geom_histogram(aes(y = ..density..),position="identity", colour="black", alpha=0.2, bins = 10)+ ggtitle("Histogram of Custom Column Medical_Keyword") + theme_bw() + stat_function(fun = dnorm, colour = "magenta",args = list(mean = mean(prudential_data$Medical_Keyword, na.rm = TRUE), sd = sd(prudential_data$Medical_Keyword, na.rm = TRUE)))
+
+# Boxplot Response ~ Medical_Keyword
+ggplot(prudential_data, aes(x=factor(Response), y=Medical_Keyword, fill = factor(Response))) + ggtitle("Boxplot Response with Medical_Keyword") + geom_boxplot(colour="black")+ xlab("Response")+ labs(fill = "Response")
+
+#Density Plot for Medical Keyword Sum
+ggplot(prudential_data, aes(x= Medical_Keyword, fill=as.factor(Response))) + geom_density(alpha=0.4)
+
+
+```
+
+
+#Medical History
+```{r}
+
+#creating a new variable = sum for all 48 medical keywords 
+Medical_History_df<-prudential_data %>% dplyr::select(starts_with("Medical_History"),-Medical_History_1, -Medical_History_2)
+
+prudential_data <- prudential_data %>% mutate(Medical_History_Sum=rowSums(Medical_History_df))
+
+cols = setdiff(names(prudential_data),names(Medical_History_df))
+
+#removing all 35 medical keyword variables
+prudential_data = prudential_data %>% dplyr::select(cols)
+
+# Distribution of custom column MedHistSum is normal
+ggplot(prudential_data, aes(x=Medical_History_Sum)) + geom_histogram(aes(y = ..density..), position="identity", colour="black", alpha=0.2, bins = 10)+ ggtitle("Histogram of Medical_History_Sum") + theme_bw() + stat_function(fun = dnorm, colour = "green3",args = list(mean = mean (prudential_data$Medical_History_Sum, na.rm = TRUE),sd = sd(prudential_data$Medical_History_Sum, na.rm = TRUE)))
+
+# Boxplot Response ~ Medical_History_Sum
+ggplot(prudential_data, aes(x=factor(Response), y=Medical_History_Sum, fill = factor(Response))) + ggtitle("Boxplot Response with Medical_History_Sum") + geom_boxplot(colour="black") + xlab("Response") +labs(fill = "Response")
+
+#Density Plot for Medical History Sum
+ggplot(prudential_data, aes(x= Medical_History_Sum, fill=as.factor(Response))) + geom_density(alpha=0.4)
+
+```
+
+
+#PCA on Product Info
+```{r}
+
+#creating a new data frame for all 7 product info 
+Product_Info_df<-prudential_data %>% dplyr::select(starts_with("Product_Info"))
+
+#normalizing the data
+pi_normalized_pca=as.data.frame(normalize(Product_Info_df,byrow=FALSE))
+
+#applying PCA
+pi_pca_output=prcomp(pi_normalized_pca, retx = TRUE, center = TRUE, scale. = TRUE)
+summary(pi_pca_output)
+
+plot(pi_pca_output,type='l')
+
+```
+
+
+#PCA on Employment Info
+```{r}
+
+#creating a new data frame for all 7 product info 
+Employment_Info_df<-prudential_data %>% dplyr::select(starts_with("Employment_Info"))
+
+#normalizing the data
+ei_normalized_pca=as.data.frame(normalize(Employment_Info_df,byrow=FALSE))
+
+#applying PCA
+ei_pca_output=prcomp(ei_normalized_pca, retx = TRUE, center = TRUE, scale. = TRUE)
+summary(ei_pca_output)
+
+plot(ei_pca_output,type='l')
+
+```
+
+
+#PCA on Insured Info
+```{r}
+
+#creating a new data frame for all 7 product info 
+Insured_Info_df<-prudential_data %>% dplyr::select(starts_with("InsuredInfo"))
+
+#normalizing the data
+ii_normalized_pca=as.data.frame(normalize(Insured_Info_df,byrow=FALSE))
+
+#applying PCA
+ii_pca_output=prcomp(ii_normalized_pca, retx = TRUE, center = TRUE, scale. = TRUE)
+summary(ii_pca_output)
+
+plot(ii_pca_output,type='l')
+
+```
+
+
+#PCA on Insurance History
+```{r}
+
+#creating a new data frame for all 7 product info 
+Insurance_History_df<-prudential_data %>% dplyr::select(starts_with("Insurance_History"))
+
+#normalizing the data
+ih_normalized_pca=as.data.frame(normalize(Insurance_History_df,byrow=FALSE))
+
+#applying PCA
+ih_pca_output=prcomp(ih_normalized_pca, retx = TRUE, center = TRUE, scale. = TRUE)
+summary(ih_pca_output)
+
+#plotting graph
+plot(ih_pca_output,type='l')
+
+#creating a dataframe of the principal components
+ih_pca=as.data.frame(ih_pca_output$x)
+
+#selecting 21 principal components which account for 70% of the total variance
+ih_pca1=subset(ih_pca,select = c(1:4))
+
+
+```
+
+
+#Removing insuarance history variables and replacing them with new 4 PCA variables
+```{r}
+
+prudential_data <- cbind(prudential_data, ih_pca1)
+
+#removing all 8 insurance history variables
+prudential_data <- prudential_data %>% dplyr::select(-starts_with("Insurance_History_"))
+
+```
+
+
+#Correlation of different variables
+```{r}
+#Correlations and ScatterPlots
+#Dervie Correlation Plot between continuous variables-1
+corr_data <- prudential_data[, c("Product_Info_4", "Ins_Age","Ht","Wt","BMI","Response")]
+corrplot(cor(corr_data))
+
+#Dervie Correlation Plot between continuous variables-1
+corr_data1 <- prudential_data[, c("Employment_Info_1", "Employment_Info_4", "Employment_Info_6","Response")]
+corrplot(cor(corr_data1))
+
+#Dervie Correlation Plot between continuous variables-1
+corr_data2 <- prudential_data[, c("Family_Hist_2", "Family_Hist_3", "Family_Hist_4","Response")]
+corrplot(cor(corr_data2))
+
+#Correlation 1 - BMI and Wt
+cor(prudential_data$BMI,prudential_data$Wt)
+#There is high correlation between Weight and BMI
+Wt_BMI <- ggplot(prudential_data, aes(x = BMI, y = Wt)) + geom_point() + geom_smooth(method=lm) 
+Wt_BMI
+
+#Correlation 2 - Ht and Wt
+cor(prudential_data$Ht,prudential_data$Wt)
+#There is high correlation between Weight and Height
+Wt_Ht <- ggplot(prudential_data, aes(x = Ht, y = Wt)) + geom_point() + geom_smooth(method=lm) 
+Wt_Ht
+
+#Correlation 3 - BMI and Ht
+cor(prudential_data$BMI,prudential_data$Ht)
+#There is high correlation between Weight and BMI
+Wt_BMI <- ggplot(prudential_data, aes(x = BMI, y = Ht)) + geom_point() + geom_smooth(method=lm) 
+Wt_BMI
+
+```
+
+
+#Correlation - removing
+```{r}
+
+c<-cor(prudential_data)
+corr_var <- findCorrelation(c, cutoff = 0.7, verbose = TRUE, names = TRUE, exact = TRUE)
+corr_var
+
+```
+
+
+#Data leakage - chosen BMI instead of Wt from correlation and removing "Id"
+```{r}
+
+vartoremove <- c("BMI","InsuredInfo_6","Employment_Info_3","Employment_Info_5", "Id")
+prudential_data <- prudential_data %>% dplyr::select(-vartoremove)
+
+str(prudential_data)
+
+```
+
+
+#Setting outcome variables as categorical
+```{r}
+
+prudential_data$Response <- factor(prudential_data$Response, levels = c(0,1), labels = c("Low Risk", "High Risk"))
+
+str(prudential_data)
+
+```
+
+
+#random forest
+```{r}
+
+set.seed(1234)
+
+rfModel1 = randomForest(as.factor(Response)~., data=prudential_data, ntree=100, importance=TRUE )
+
+# To check important variables
+varImpPlot(rfModel1) 
+
+d<-importance(rfModel1)
+
+```
+
+
+#Selecting top 25 important variables in our final data set from RF
+```{r}
+
+d <- d[order(-d[,3]),]
+
+d <- head(d, n = 25)
+
+impvar <- rownames(d)
+
+prudential_data <- prudential_data %>% dplyr::select(impvar, Response)
+
+str(prudential_data)
+
+```
+
+
+# split the data into training and test data
+```{r}
+#split the data into trn, tst subsets
+#70:30 split
+set.seed(1234)
+
+nr<-nrow(prudential_data)
+trnIndex<- sample(1:nr, size = round(0.7*nr), replace=FALSE)
+pdTrn <- prudential_data[trnIndex, ]
+pdVal <- prudential_data[-trnIndex, ]
+
+#Check dimensions of the split in original data
+prop.table(table(prudential_data$Response)) * 100
+ 
+#Check dimensions of the split in training data
+prop.table(table(pdTrn$Response)) * 100
+ 
+#Check dimensions of the split in validation data
+prop.table(table(pdVal$Response)) * 100
+
+# All data sets have same proportion of data i.e. 25% low risk and 75% high risk
+
+#Test Data Distribution
+df_val <- pdVal %>% group_by(Response) %>% count(Response) 
+
+ggplot(df_val, aes(x = Response,y = n, fill = factor(Response))) + geom_bar(stat = "identity") + xlab("Response") + ylab("Frequency") +geom_text(aes(label=n), vjust=1.5, colour="white", size=3.5)
+
+
+```
+
+
+#KNN Model - best at K =29
+```{r}
+
+set.seed(1234)
+
+pdTrn.target<- pdTrn[,which(colnames(pdTrn)=="Response")]
+pdVal.target<- pdVal[,which(colnames(pdVal)=="Response")]
+pdTrn1 <- pdTrn %>% dplyr::select(-Response)
+pdVal1 <- pdVal %>% dplyr::select(-Response)
+
+#Find Best value of K
+
+i=1 # declaration to initiate for loop
+k.optm=1 # declaration to initiate for loop
+for (i in seq(1,60,4)){ 
+    knn.mod <-  knn(train=pdTrn1, test=pdVal1, cl=pdTrn.target, k=i)
+    k.optm[i] <- 100 * sum(pdVal.target == knn.mod)/NROW(pdVal.target)
+    k=i  
+    cat(k,'=',k.optm[i],'\n') # to print % accuracy 
+}
+
+# Maximum accuracy at k=29
+plot(k.optm, type="b", xlab="K- Value",ylab="Accuracy level")
+
+# Plot error
+plot(1-k.optm, type="b", xlab="K- Value",ylab="Error")
+
+#knn model at k = 29
+model1<- knn(train=pdTrn1, test=pdVal1, cl=pdTrn.target, k=29)
+
+xtab = table(model1, pdVal.target)
+print(xtab)
+
+accuracy = sum(model1 == pdVal.target)/length(pdVal.target)
+precision = xtab[1,1]/sum(xtab[,1])
+recall = xtab[1,1]/sum(xtab[1,])
+f = 2 * (precision * recall) / (precision + recall)
+cat(paste("Accuracy:\t", format(accuracy, digits=2), "\n",sep=" "))
+cat(paste("Precision:\t", format(precision, digits=2), "\n",sep=" "))
+cat(paste("Recall:\t\t", format(recall, digits=2), "\n",sep=" "))
+cat(paste("F-measure:\t", format(f, digits=2), "\n",sep=" "))
+
+#recall is same as sensitivity
+knn_table <- table(pdVal.target, model1)
+accuracy <- function(x){sum(diag(x)/(sum(rowSums(x)))) * 100}
+accuracy(knn_table)
+plot(model1)
+
+```
+
+
+# Naive bayes model
+```{r}
+#create objects x which holds the predictor variables and y which holds the response variables
+set.seed(1234)
+
+x = pdTrn[,-26]
+y = pdTrn$Response
+
+# developing naive bayes model - baseline - fl = 0 and adjust = 1 and kernel = falsi
+nb_model1 = train(x = x, y = y, method = "nb", trControl = trainControl(method='cv',number=10))
+nb_model1
+#accuracy of training = 75.07
+
+#Model Evaluation
+#Predict testing set
+Predict_val <- predict(nb_model1,newdata = pdVal)
+
+#Get the confusion matrix to see accuracy value and other parameter values
+confusionMatrix(Predict_val, pdVal$Response)
+#accuracy = 75.17
+
+#model 2 by tuning
+# set up 10-fold cross validation procedure
+train_control <- trainControl(method = "cv", number = 10)
+
+#tunig the model
+# set up tuning grid
+search_grid <- expand.grid( usekernel = c(TRUE, FALSE), fL = 1:3, adjust = 0:3)
+
+
+# train model
+nb.model2 <- train( x = x,y = y, method = "nb",trControl = trainControl, tuneGrid = search_grid)
+
+# top 5 modesl
+nb.model2$results %>% top_n(5, wt = Accuracy) %>% arrange(desc(Accuracy))
+
+```
+
+
+# Svm models. 
+#We will get optimal cost and gamma parameter BY GRID SEARCH which we will for creating svm model.
+#We are using Linear, Polynomial, Sigmoid and Radial kernels to create svm model, later we will check the accuracy of all the kernels whichever is best in terms of accuracy we will pick it.
+
+#SVM Model - Linear
+```{r}
+set.seed(1234)
+
+#tuning the dataset using "linear kernel"
+svm_linear <- tune(svm, Response ~ ., data = pdTrn, kernel="linear", ranges=list(cost= c(0.025,0.00001), gamma=c(0.00001)))
+
+#summary of the tuning
+summary_linear <- summary(svm_linear)
+
+#printing the summary
+print(summary_linear$best.parameters)
+
+#Applying SVM with the best parameters we found after tuning. 
+linear_model = svm(Response ~ ., data = pdTrn, kernel = "linear", cost = 0.025 ,gamma=0.00001, type = "C-classification")
+
+# Predicting the Values using model created using SVM.
+predict_linear <-  predict(linear_model, pdVal[-26])
+
+#Get the confusion matrix to see accuracy value and other parameter values
+confusionMatrix(predict_linear, pdVal$Response)
+
+
+```
+
+
+#SVM Model - Radial
+```{r}
+
+#tuning the dataset using "linear kernel"
+svm_radial <- tune(svm, Response ~ ., data = pdTrn, kernel="radial", ranges=list(cost=c(0.001,100,1000,10000,50000,100000,200000,1000000), gamma=c(0.001,1,2,0.000001,0.00001,0.0000000001)))
+
+#summary of the tuning
+summary_radial <- summary(svm_radial)
+
+#printing the summary
+print(summary_radial$best.parameters)
+
+#Applying SVM with the best parameters we found after tuning. 
+radial_model = svm(Response ~ ., data = pdTrn, kernel = "radial", cost = 1000000 ,gamma= 0.00001, type = "C-classification")
+
+# Predicting the Values using model created using SVM.
+predict_radial <-  predict(radial_model, pdVal[-26])
+
+#Get the confusion matrix to see accuracy value and other parameter values
+confusionMatrix(predict_radial, pdVal$Response)
+
+
+```
+
+
+#SVM Model - Sigmoid
+```{r}
+
+#tuning the dataset using "linear kernel"
+svm_sigmoid <- tune(svm, Response ~ ., data = pdTrn, kernel="sigmoid", ranges=list(cost=c(10,10000,100000), gamma=c(0.00001,100,0.1)))
+
+#summary of the tuning
+summary_sigmoid <- summary(svm_sigmoid)
+
+#printing the summary
+print(summary_sigmoid$best.parameters)
+
+#Applying SVM with the best parameters we found after tuning. 
+sigmoid_model = svm(Response ~ ., data = pdTrn, kernel = "sigmoid", cost = 10000 ,gamma=0.00001, type = "C-classification")
+
+# Predicting the Values using model created using SVM.
+predict_sigmoid <-  predict(sigmoid_model, pdVal[-26])
+
+#Get the confusion matrix to see accuracy value and other parameter values
+confusionMatrix(predict_sigmoid, pdVal$Response)
+
+
+```
+
+
+#SVM Model - Polynomial
+```{r}
+
+#tuning the dataset using "linear kernel"
+svm_poly <- tune(svm, Response ~ ., data = pdTrn, kernel="polynomial", ranges=list(cost=c(10,1000,0.025,0.00025,1), degree=c(4,5)))
+
+#summary of the tuning
+summary_poly <- summary(svm_poly)
+
+#printing the summary
+print(summary_poly$best.parameters)
+
+#Applying SVM with the best parameters we found after tuning. 
+poly_model = svm(Response ~ ., data = pdTrn, kernel = "polynomial", degree = 4, cost = 1, type = "C-classification")
+
+# Predicting the Values using model created using SVM.
+predict_poly <-  predict(poly_model, pdVal[-26])
+
+#Get the confusion matrix to see accuracy value and other parameter values
+confusionMatrix(predict_poly, pdVal$Response)
+
+```
+
+
+# Logistic regression models
+```{r}
+set.seed(1234)
+
+# Make model.matrix and remove response column. '26' is the column number for response
+x <- model.matrix(Response~., pdTrn)[,-26]
+y <- pdTrn$Response
+
+
+```
+
+
+#alpha is 1 for lasso and 0 for ridge
+#MODEL 1 - LASSO, with lambda.min
+```{r}
+#Run glmnet model to get list of lambda values
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+
+#Run glmnet model with cv.lasso$lambda.min
+GLMmodel1 <- glmnet(x, y, alpha = 1, family = "binomial",lambda = cv.lasso$lambda.min)
+
+# Display classification coefficients
+coef(GLMmodel1)
+
+# Make predictions on the train data for Model 1
+GLM1.train <- model.matrix(Response ~., pdTrn)[,-26]
+GLM1Trn_prob <- GLMmodel1 %>% predict(newx = GLM1.train)
+
+#predict for trainset Model
+GLM1Trn_predclass <- ifelse(GLM1Trn_prob > 0.5, "High Risk", "Low Risk")
+
+# Model accuracy
+GLM1Trn_obsclass <- pdTrn$Response
+mean(GLM1Trn_predclass == GLM1Trn_obsclass)
+
+#confusion matrix for training
+confusionMatrix(as.factor(GLM1Trn_predclass), as.factor(pdTrn$Response))
+#accuracy of training = 75.92
+
+# Make predictions on the test data for Model 1
+GLM1.test <- model.matrix(Response ~., pdVal)[,-26]
+GLM1Tst_prob <- GLMmodel1 %>% predict(newx = GLM1.test)
+
+GLM1Tst_predclass <- ifelse(GLM1Tst_prob > 0.5, "High Risk", "Low Risk")
+
+# Model accuracy
+GLM1Tst_obsclass <- pdVal$Response
+mean(GLM1Tst_predclass == GLM1Tst_obsclass)
+
+#confusion matrix
+confusionMatrix(as.factor(GLM1Tst_predclass), as.factor(pdVal$Response))
+#accuracy of training = 76.10
+
+
+```
+
+
+#MODEL 2 - Ridge, with lambda.min
+```{r}
+#Run glmnet model to get list of lambda values
+cv.ridge <- cv.glmnet(x, y, alpha = 0, family = "binomial")
+
+#Run glmnet model with cv.lasso$lambda.min
+GLMmodel2 <- glmnet(x, y, alpha = 0, family = "binomial",lambda = cv.ridge$lambda.min)
+
+# Display classification coefficients
+coef(GLMmodel2)
+
+# Make predictions on the train data for Model 1
+GLM2.train <- model.matrix(Response ~., pdTrn)[,-26]
+
+GLM2Trn_prob <- GLMmodel2 %>% predict(newx = GLM2.train)
+
+#predict for trainset Model
+GLM2Trn_predclass <- ifelse(GLM2Trn_prob > 0.5, "High Risk", "Low Risk")
+
+# Model accuracy
+GLM2Trn_obsclass <- pdTrn$Response
+mean(GLM2Trn_predclass == GLM2Trn_obsclass)
+#accuracy = 76.07%
+
+#confusion matrix for training
+confusionMatrix(as.factor(GLM2Trn_predclass), as.factor(pdTrn$Response))
+
+# Make predictions on the test data for Model 1
+GLM2.test <- model.matrix(Response ~., pdVal)[,-26]
+GLM2Tst_prob <- GLMmodel2 %>% predict(newx = GLM2.test)
+
+GLM2Tst_predclass <- ifelse(GLM2Tst_prob > 0.5, "High Risk", "Low Risk")
+
+# Model accuracy
+GLM2Tst_obsclass <- pdVal$Response
+mean(GLM2Tst_predclass == GLM2Tst_obsclass)
+
+#confusion matrix
+confusionMatrix(as.factor(GLM2Tst_predclass), as.factor(pdVal$Response))
+#accuracy = 76.14%
+
+```
+
+
+# MODEL 3 - Elasticnet, with lambda.min
+```{r}
+#Run glmnet model to get list of lambda values
+cv.elasticnet <- cv.glmnet(x, y, alpha = 0.5, family = "binomial")
+
+#Run glmnet model with cv.lasso$lambda.min
+GLMmodel3 <- glmnet(x, y, alpha = 0.5, family = "binomial",lambda = cv.elasticnet$lambda.min)
+
+# Display classification coefficients
+coef(GLMmodel3)
+
+# Make predictions on the train data for Model 1
+GLM3.train <- model.matrix(Response ~., pdTrn)[,-26]
+
+GLM3Trn_prob <- GLMmodel3 %>% predict(newx = GLM3.train)
+
+#predict for trainset Model
+GLM3Trn_predclass <- ifelse(GLM3Trn_prob > 0.5, "High Risk", "Low Risk")
+
+# Model accuracy
+GLM3Trn_obsclass <- pdTrn$Response
+mean(GLM3Trn_predclass == GLM3Trn_obsclass)
+#accuracy = 75.91%
+
+#confusion matrix for training
+confusionMatrix(as.factor(GLM3Trn_predclass), as.factor(pdTrn$Response))
+
+# Make predictions on the test data for Model 1
+GLM3.test <- model.matrix(Response ~., pdVal)[,-26]
+GLM3Tst_prob <- GLMmodel3 %>% predict(newx = GLM3.test)
+
+GLM3Tst_predclass <- ifelse(GLM3Tst_prob > 0.5, "High Risk", "Low Risk")
+
+# Model accuracy
+GLM3Tst_obsclass <- pdVal$Response
+mean(GLM3Tst_predclass == GLM3Tst_obsclass)
+
+#confusion matrix
+confusionMatrix(as.factor(GLM3Tst_predclass), as.factor(pdVal$Response))
+#accuracy = 76.09%
+
+```
+
+
+
+#ROC curves
+```{r}
+# ROC curve comparison
+#Logistic
+predvec <- ifelse(GLM2Tst_predclass=="Low Risk", 1, 0)
+realvec <- ifelse(pdVal$Response=="Low Risk", 1, 0)
+pred <- prediction(predvec,realvec)
+perf_GLM <- performance(pred, measure = "tpr", x.measure = "fpr")
+plot(perf_GLM, main = "ROC curve for Logistic Classifier",col = "blue", lwd = 3)
+abline(a = 0, b = 1, lwd = 2, lty = 2)
+perf_GLM <- performance(pred, measure = "auc")
+unlist(perf_GLM@y.values)
+
+
+#SVM
+predvec <- ifelse(radial_predict=="Low Risk", 1, 0)
+realvec <- ifelse(pdVal$Response=="Low Risk", 1, 0)
+pred <- prediction(predvec,realvec)
+perf_SVM <- performance(pred, measure = "tpr", x.measure = "fpr")
+plot(perf_SVM, main = "ROC curve for SVM Classifier",col = "blue", lwd = 3)
+abline(a = 0, b = 1, lwd = 2, lty = 2)
+perf_SVM <- performance(pred, measure = "auc")
+unlist(perf_SVM@y.values)
+
+#Naive Bayes
+predvec <- ifelse(Predict_val=="Low Risk", 1, 0)
+realvec <- ifelse(pdVal$Response=="Low Risk", 1, 0)
+pred <- prediction(predvec,realvec)
+perf_NB <- performance(pred, measure = "tpr", x.measure = "fpr")
+plot(perf_NB, main = "ROC curve for Naive Bayes Classifier",col = "blue", lwd = 3)
+abline(a = 0, b = 1, lwd = 2, lty = 2)
+perf_NB <- performance(pred, measure = "auc")
+unlist(perf_NB@y.values)
+
+```
